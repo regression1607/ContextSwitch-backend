@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const compressRoutes = require('./routes/compress');
 const contactRoutes = require('./routes/contact');
 const userRoutes = require('./routes/user');
+const stripeRoutes = require('./routes/stripe');
 
 const app = express();
 
@@ -17,6 +18,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true
 }));
+
+// Stripe webhook needs raw body - must be before express.json()
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -59,6 +63,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/compress', compressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // 404 handler
 app.use((req, res) => {
