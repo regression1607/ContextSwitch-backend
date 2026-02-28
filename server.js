@@ -18,6 +18,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Handle preflight requests before any other middleware
+app.options('*', cors());
+
 app.use(express.json({ limit: '10mb' }));
 
 // MongoDB connection for serverless
