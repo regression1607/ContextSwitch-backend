@@ -13,6 +13,13 @@ const openai = new OpenAI({
 // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
 const estimateTokens = (text) => Math.ceil(text.length / 4);
 
+// Plan limits configuration
+const PLAN_LIMITS = {
+  free: { maxCompressionsPerMonth: 0, canCompress: false },
+  pro: { maxCompressionsPerMonth: 50, canCompress: true },
+  enterprise: { maxCompressionsPerMonth: 200, canCompress: true }
+};
+
 // Compress context
 router.post('/', auth, async (req, res) => {
   try {
@@ -20,6 +27,38 @@ router.post('/', auth, async (req, res) => {
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ success: false, message: 'Messages array is required' });
+    }
+
+    // Get fresh user data with subscription info
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    const plan = user.subscription?.plan || 'free';
+    const planLimits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+
+    // Check if plan allows compression
+    if (!planLimits.canCompress) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'AI compression is a Pro feature. Please upgrade to use compression.',
+        code: 'UPGRADE_REQUIRED'
+      });
+    }
+
+    // Check monthly limit
+    const monthlyUsage = user.usage?.monthlyCompressions || 0;
+    if (monthlyUsage >= planLimits.maxCompressionsPerMonth) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Monthly compression limit reached (${planLimits.maxCompressionsPerMonth}). Upgrade for more compressions.`,
+        code: 'LIMIT_REACHED',
+        usage: {
+          used: monthlyUsage,
+          limit: planLimits.maxCompressionsPerMonth
+        }
+      });
     }
 
     // Format messages for compression
