@@ -74,11 +74,11 @@ const userSchema = new mongoose.Schema({
   limits: {
     maxCompressionsPerMonth: {
       type: Number,
-      default: 50 // Free plan default
+      default: 0 // Free plan = no compression (Pro feature)
     },
     maxContextsStored: {
       type: Number,
-      default: 10 // Free plan default
+      default: 10 // Free plan = unlimited local saves
     }
   }
 }, { timestamps: true });
