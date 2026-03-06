@@ -68,31 +68,37 @@ router.post('/', auth, async (req, res) => {
 
     const originalLength = conversationText.length;
 
-    // Use GPT to compress
+    // Use GPT to compress into ultra-compact AI-readable format
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a context compression assistant. Your task is to compress conversation history into a compact, AI-readable format that preserves all essential information needed to continue the conversation.
+          content: `You are an AI context compression engine. Compress conversation into an ULTRA-COMPACT format optimized for AI parsing, NOT human readability.
 
-Output a structured summary with:
-1. PROJECT_CONTEXT: Brief description of what's being worked on
-2. KEY_DECISIONS: Important decisions made during the conversation
-3. CURRENT_STATE: Where things currently stand
-4. CODE_ARTIFACTS: Any important code snippets or file paths mentioned
-5. PENDING_TASKS: What still needs to be done
-6. CRITICAL_DETAILS: Any specific values, names, or technical details that must be preserved
+OUTPUT FORMAT RULES:
+- NO spaces between sections (use | as delimiter)
+- NO newlines (single continuous string)
+- Use abbreviations: U=user,A=assistant,P=project,S=state,T=task,D=decision,C=code,F=file,V=value,E=error,X=fix
+- Use symbols: >=output,<=input,@=path,#=id,*=important,~=approximate,^=version
+- Compress variable names to initials
+- Remove all articles (a,an,the), filler words
+- Use shorthand: fn=function,var=variable,cfg=config,db=database,api=API,auth=authentication,req=request,res=response,err=error,msg=message,btn=button,ctx=context
 
-Be concise but complete. The output should allow another AI to seamlessly continue this conversation.`
+STRUCTURE: CTX[project-name]|S[current-state]|D[key-decisions;separated;by;semicolon]|T[pending-tasks]|C[code-artifacts]|V[critical-values-key:val]|H[conversation-history-ultra-compressed]
+
+EXAMPLE OUTPUT:
+CTX[ecommerce-app]|S[auth-flow-done;payment-pending]|D[use-stripe;jwt-auth;postgres-db]|T[implement-checkout;add-webhooks]|C[@src/api/payment.js:createIntent()]|V[api_ver:v2;env:prod]|H[U:setup-payment>A:use-stripe-sdk>U:show-code>A:*implemented-createPaymentIntent]
+
+The output must be a SINGLE LINE with ZERO unnecessary spaces. AI will parse this to continue the conversation seamlessly.`
         },
         {
           role: 'user',
-          content: `Compress this conversation from project "${projectName || 'Unknown'}":\n\n${conversationText}`
+          content: `Compress this conversation from project "${projectName || 'Unknown'}" into ultra-compact AI-readable format:\n\n${conversationText}`
         }
       ],
-      max_tokens: 2000,
-      temperature: 0.3
+      max_tokens: 1500,
+      temperature: 0.2
     });
 
     const compressedContext = completion.choices[0].message.content;
