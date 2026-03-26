@@ -123,6 +123,66 @@ router.get('/sitemap', sitemapHandler);
 // GET /api/posts/sitemap.xml - Alias with .xml extension
 router.get('/sitemap.xml', sitemapHandler);
 
+// GET /api/posts/rss - RSS feed for posts (public)
+async function rssHandler(req, res) {
+  try {
+    const posts = await Post.find({ status: 'published' })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate('author', 'name')
+      .select('_id title content tags platform category createdAt author');
+
+    const siteUrl = 'https://www.context-switch.dev';
+    const escape = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const items = posts.map(post => {
+      const desc = escape(post.content.substring(0, 300).replace(/\n/g, ' '));
+      const title = escape(post.title);
+      const author = escape(post.author?.name || 'Anonymous');
+      const cats = (post.tags || []).map(t => `<category>${escape(t)}</category>`).join('');
+      return `    <item>
+      <title>${title}</title>
+      <link>${siteUrl}/posts/${post._id}</link>
+      <guid isPermaLink="true">${siteUrl}/posts/${post._id}</guid>
+      <description>${desc}</description>
+      <author>${author}</author>
+      <pubDate>${new Date(post.createdAt).toUTCString()}</pubDate>
+      ${cats}
+    </item>`;
+    }).join('\n');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>ContextSwitch AI Hub</title>
+    <link>${siteUrl}/posts</link>
+    <description>AI prompts, news, tutorials, and discussions from the ContextSwitch community</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <atom:link href="${siteUrl}/api/posts/rss.xml" rel="self" type="application/rss+xml"/>
+    <image>
+      <url>${siteUrl}/favicon.svg</url>
+      <title>ContextSwitch AI Hub</title>
+      <link>${siteUrl}/posts</link>
+    </image>
+${items}
+  </channel>
+</rss>`;
+
+    res.status(200);
+    res.header('Content-Type', 'application/rss+xml; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('Cache-Control', 'public, max-age=1800, s-maxage=3600');
+    return res.send(xml);
+  } catch (error) {
+    console.error('RSS error:', error);
+    res.status(500).header('Content-Type', 'application/rss+xml').send('<?xml version="1.0"?><rss version="2.0"><channel><title>Error</title></channel></rss>');
+  }
+}
+
+router.get('/rss', rssHandler);
+router.get('/rss.xml', rssHandler);
+
 // GET /api/posts/og/:id - OG meta data for a post (used by crawlers/social sharing)
 router.get('/og/:id', async (req, res) => {
   try {
