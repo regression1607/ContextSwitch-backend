@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const compressRoutes = require('./routes/compress');
 const contactRoutes = require('./routes/contact');
 const userRoutes = require('./routes/user');
+const postRoutes = require('./routes/posts');
 
 const app = express();
 
@@ -28,7 +29,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
 
 // MongoDB connection for serverless
 let isConnected = false;
@@ -69,6 +70,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/compress', compressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/posts', postRoutes);
 
 // 404 handler
 app.use((req, res) => {
