@@ -87,6 +87,102 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/posts/sitemap - Dynamic sitemap for all published posts (public)
+router.get('/sitemap', async (req, res) => {
+  try {
+    const posts = await Post.find({ status: 'published' })
+      .sort({ createdAt: -1 })
+      .select('_id createdAt updatedAt title');
+
+    const siteUrl = 'https://www.context-switch.dev';
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${siteUrl}/posts</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+
+    for (const post of posts) {
+      const lastmod = (post.updatedAt || post.createdAt).toISOString().split('T')[0];
+      xml += `
+  <url>
+    <loc>${siteUrl}/posts/${post._id}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+    }
+
+    xml += '\n</urlset>';
+
+    res.set('Content-Type', 'application/xml');
+    res.send(xml);
+  } catch (error) {
+    console.error('Sitemap error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/posts/og/:id - OG meta data for a post (used by crawlers/social sharing)
+router.get('/og/:id', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate('author', 'name');
+
+    if (!post || post.status !== 'published') {
+      return res.redirect(301, 'https://www.context-switch.dev/posts');
+    }
+
+    const siteUrl = 'https://www.context-switch.dev';
+    const postUrl = `${siteUrl}/posts/${post._id}`;
+    const escape = (str) => str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const title = escape(post.title);
+    const description = escape(post.content.substring(0, 200).replace(/\n/g, ' '));
+    const authorName = escape(post.author?.name || 'Anonymous');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title} | ContextSwitch AI Hub</title>
+<meta name="description" content="${description}">
+<meta name="author" content="${authorName}">
+<link rel="canonical" href="${postUrl}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description}">
+<meta property="og:url" content="${postUrl}">
+<meta property="og:site_name" content="ContextSwitch AI Hub">
+<meta property="og:image" content="${siteUrl}/og-image.png">
+<meta property="article:published_time" content="${post.createdAt.toISOString()}">
+<meta property="article:author" content="${authorName}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${description}">
+<meta name="twitter:image" content="${siteUrl}/og-image.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"${title}","description":"${description}","url":"${postUrl}","datePublished":"${post.createdAt.toISOString()}","author":{"@type":"Person","name":"${authorName}"},"publisher":{"@type":"Organization","name":"ContextSwitch","url":"${siteUrl}"}}
+</script>
+<meta http-equiv="refresh" content="0; url=${postUrl}">
+</head>
+<body>
+<h1>${title}</h1>
+<p>By ${authorName}</p>
+<p>${description}</p>
+<p><a href="${postUrl}">Read full post on ContextSwitch AI Hub</a></p>
+</body>
+</html>`;
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('OG meta error:', error);
+    res.redirect(301, 'https://www.context-switch.dev/posts');
+  }
+});
+
 // GET /api/posts/recent - Get recent posts for homepage (public)
 router.get('/recent', optionalAuth, async (req, res) => {
   try {
