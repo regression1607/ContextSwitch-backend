@@ -87,42 +87,41 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
-// GET /api/posts/sitemap - Dynamic sitemap for all published posts (public)
-router.get('/sitemap', async (req, res) => {
+// Sitemap handler (shared between /sitemap and /sitemap.xml)
+async function sitemapHandler(req, res) {
   try {
     const posts = await Post.find({ status: 'published' })
       .sort({ createdAt: -1 })
       .select('_id createdAt updatedAt title');
 
     const siteUrl = 'https://www.context-switch.dev';
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${siteUrl}/posts</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>`;
+    const urls = [`  <url>\n    <loc>${siteUrl}/posts</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>`];
 
     for (const post of posts) {
       const lastmod = (post.updatedAt || post.createdAt).toISOString().split('T')[0];
-      xml += `
-  <url>
-    <loc>${siteUrl}/posts/${post._id}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>`;
+      urls.push(`  <url>\n    <loc>${siteUrl}/posts/${post._id}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`);
     }
 
-    xml += '\n</urlset>';
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.join('\n') + '\n</urlset>';
 
-    res.set('Content-Type', 'application/xml');
-    res.send(xml);
+    res.status(200);
+    res.header('Content-Type', 'application/xml; charset=utf-8');
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+    return res.send(xml);
   } catch (error) {
     console.error('Sitemap error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    const fallback = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://www.context-switch.dev/posts</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n</urlset>';
+    res.status(200);
+    res.header('Content-Type', 'application/xml; charset=utf-8');
+    return res.send(fallback);
   }
-});
+}
+
+// GET /api/posts/sitemap - Dynamic sitemap (public)
+router.get('/sitemap', sitemapHandler);
+// GET /api/posts/sitemap.xml - Alias with .xml extension
+router.get('/sitemap.xml', sitemapHandler);
 
 // GET /api/posts/og/:id - OG meta data for a post (used by crawlers/social sharing)
 router.get('/og/:id', async (req, res) => {

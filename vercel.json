@@ -19,6 +19,15 @@
       }
     },
     {
+      "src": "/api/posts/sitemap",
+      "dest": "server.js",
+      "headers": {
+        "Content-Type": "application/xml; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "public, max-age=3600, s-maxage=86400"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js",
       "headers": {
