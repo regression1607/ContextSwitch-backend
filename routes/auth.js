@@ -12,23 +12,39 @@ const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
-// Google Sign-In
+// Google Sign-In (supports ID token from website + access token from extension)
 router.post('/google', async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { credential, access_token } = req.body;
 
-    if (!credential) {
-      return res.status(400).json({ success: false, message: 'Google credential is required' });
+    if (!credential && !access_token) {
+      return res.status(400).json({ success: false, message: 'Google credential or access token is required' });
     }
 
-    // Verify the Google ID token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    let googleId, email, name, picture;
 
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
+    if (credential) {
+      // Website flow: verify Google ID token
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      ({ sub: googleId, email, name, picture } = payload);
+    } else {
+      // Extension flow: verify access token via Google userinfo API
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      if (!userInfoRes.ok) {
+        return res.status(401).json({ success: false, message: 'Invalid Google access token' });
+      }
+      const userInfo = await userInfoRes.json();
+      googleId = userInfo.sub;
+      email = userInfo.email;
+      name = userInfo.name;
+      picture = userInfo.picture;
+    }
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email not provided by Google' });
