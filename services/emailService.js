@@ -1,22 +1,40 @@
+const https = require('https');
+const url = require('url');
+
 const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK;
 
-const saveToSheet = async (data) => {
-  if (!GOOGLE_SHEET_WEBHOOK) {
-    throw new Error('GOOGLE_SHEET_WEBHOOK is not configured');
-  }
+const saveToSheet = (data) => {
+  return new Promise((resolve, reject) => {
+    if (!GOOGLE_SHEET_WEBHOOK) {
+      return reject(new Error('GOOGLE_SHEET_WEBHOOK is not configured'));
+    }
 
-  const response = await fetch(GOOGLE_SHEET_WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    const postData = JSON.stringify(data);
+    const parsed = new URL(GOOGLE_SHEET_WEBHOOK);
+
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      // Google Apps Script returns 302 redirect — that's OK
+      if (res.statusCode === 302 || res.statusCode === 200) {
+        resolve({ success: true });
+      } else {
+        reject(new Error(`Google Sheet webhook failed: ${res.statusCode}`));
+      }
+    });
+
+    req.on('error', (err) => reject(err));
+    req.write(postData);
+    req.end();
   });
-
-  // Google Apps Script redirects on POST, so follow the redirect
-  if (!response.ok && response.status !== 302) {
-    throw new Error(`Google Sheet webhook failed: ${response.status}`);
-  }
-
-  return { success: true };
 };
 
 const saveContactForm = async ({ name, email, phone, subject, message }) => {
