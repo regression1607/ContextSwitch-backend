@@ -1,75 +1,56 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 
 const router = express.Router();
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT token
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
-// Signup
-router.post('/signup', async (req, res) => {
+// Google Sign-In
+router.post('/google', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { credential } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential is required' });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
-    }
-
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Email already in use' });
-    }
-
-    const user = await User.create({
-      name,
-      email: email.toLowerCase(),
-      password
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const token = generateToken(user._id);
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
 
-    res.status(201).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        subscription: user.subscription,
-        usage: user.usage,
-        limits: user.limits
-      }
-    });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Login
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email not provided by Google' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
-    }
+    // Find existing user or create new one
+    let user = await User.findOne({ email: email.toLowerCase() });
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    if (user) {
+      // Update Google info if not set
+      if (!user.googleId) user.googleId = googleId;
+      if (!user.profilePicture && picture) user.profilePicture = picture;
+      if (picture) user.profilePicture = picture;
+      await user.save();
+    } else {
+      // Create new user
+      user = await User.create({
+        name,
+        email: email.toLowerCase(),
+        googleId,
+        profilePicture: picture || null,
+      });
     }
 
     const token = generateToken(user._id);
@@ -81,14 +62,18 @@ router.post('/login', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        profilePicture: user.profilePicture,
         subscription: user.subscription,
         usage: user.usage,
         limits: user.limits
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Google auth error:', error);
+    if (error.message?.includes('Token used too late') || error.message?.includes('Invalid token')) {
+      return res.status(401).json({ success: false, message: 'Google sign-in expired. Please try again.' });
+    }
+    res.status(500).json({ success: false, message: 'Google authentication failed' });
   }
 });
 
