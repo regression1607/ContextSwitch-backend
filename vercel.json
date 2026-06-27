@@ -35,5 +35,11 @@
         "Access-Control-Allow-Credentials": "true"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/payment/check-renewals",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

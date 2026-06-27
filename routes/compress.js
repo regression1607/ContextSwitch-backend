@@ -1,6 +1,7 @@
 const express = require('express');
 const OpenAI = require('openai');
 const auth = require('../middleware/auth');
+const checkSubscription = require('../middleware/checkSubscription');
 const Context = require('../models/Context');
 const User = require('../models/User');
 
@@ -21,7 +22,7 @@ const PLAN_LIMITS = {
 };
 
 // Compress context
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, checkSubscription, async (req, res) => {
   try {
     const { messages, projectName } = req.body;
 

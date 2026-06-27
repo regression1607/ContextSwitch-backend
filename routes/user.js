@@ -1,12 +1,13 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const checkSubscription = require('../middleware/checkSubscription');
 const User = require('../models/User');
 const Context = require('../models/Context');
 
 const router = express.Router();
 
 // Get user profile with stats
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', auth, checkSubscription, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     
@@ -29,6 +30,19 @@ router.get('/profile', auth, async (req, res) => {
       await user.save();
     }
 
+    // Calculate subscription days remaining
+    let daysRemaining = null;
+    let isExpired = false;
+    if (user.subscription?.endDate && user.subscription.plan !== 'free') {
+      const msLeft = new Date(user.subscription.endDate) - new Date();
+      daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+      isExpired = daysRemaining === 0;
+    }
+    if (user.subscription?.status === 'expired') {
+      isExpired = true;
+      daysRemaining = 0;
+    }
+
     res.json({
       success: true,
       data: {
@@ -38,7 +52,11 @@ router.get('/profile', auth, async (req, res) => {
           email: user.email,
           createdAt: user.createdAt
         },
-        subscription: user.subscription,
+        subscription: {
+          ...user.subscription.toObject(),
+          daysRemaining,
+          isExpired,
+        },
         usage: user.usage,
         limits: user.limits,
         contextStats,
