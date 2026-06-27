@@ -1,6 +1,7 @@
 const https = require('https');
-const url = require('url');
+const nodemailer = require('nodemailer');
 
+// --- Google Sheets (for contact form & subscription interest) ---
 const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK;
 
 const saveToSheet = (data) => {
@@ -23,7 +24,6 @@ const saveToSheet = (data) => {
     };
 
     const req = https.request(options, (res) => {
-      // Google Apps Script returns 302 redirect — that's OK
       if (res.statusCode === 302 || res.statusCode === 200) {
         resolve({ success: true });
       } else {
@@ -58,6 +58,17 @@ const saveSubscriptionInterest = async ({ name, email, phone, plan, message }) =
     message: message || `User wants to subscribe to ${plan} plan`,
   });
 };
+
+// --- SMTP (for renewal reminder emails to users) ---
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 const sendRenewalReminderEmail = async ({ name, email, plan, daysRemaining, renewUrl }) => {
   const mailOptions = {
@@ -101,4 +112,5 @@ const sendRenewalReminderEmail = async ({ name, email, plan, daysRemaining, rene
 module.exports = {
   saveContactForm,
   saveSubscriptionInterest,
+  sendRenewalReminderEmail,
 };
