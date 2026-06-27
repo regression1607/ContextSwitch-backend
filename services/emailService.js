@@ -1,90 +1,47 @@
-const nodemailer = require('nodemailer');
+const GOOGLE_SHEET_WEBHOOK = process.env.GOOGLE_SHEET_WEBHOOK;
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const saveToSheet = async (data) => {
+  if (!GOOGLE_SHEET_WEBHOOK) {
+    throw new Error('GOOGLE_SHEET_WEBHOOK is not configured');
+  }
 
-const sendContactEmail = async ({ name, email, phone, subject, message, plan }) => {
-  const mailOptions = {
-    from: process.env.SMTP_FROM,
-    to: process.env.SMTP_USER,
-    subject: `ContextSwitch - ${subject || 'New Contact Form Submission'}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #c8f542; background: #0a0a0a; padding: 20px; border-radius: 8px;">
-          New Contact Form Submission
-        </h2>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 20px;">
-          <h3 style="margin-top: 0;">Contact Details</h3>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
-          ${plan ? `<p><strong>Interested Plan:</strong> ${plan}</p>` : ''}
-        </div>
-        
-        <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-          <h3 style="margin-top: 0;">Message</h3>
-          <p>${message}</p>
-        </div>
-        
-        <p style="color: #666; font-size: 12px; margin-top: 20px;">
-          This email was sent from ContextSwitch website contact form.
-        </p>
-      </div>
-    `,
-  };
+  const response = await fetch(GOOGLE_SHEET_WEBHOOK, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
 
-  return transporter.sendMail(mailOptions);
+  // Google Apps Script redirects on POST, so follow the redirect
+  if (!response.ok && response.status !== 302) {
+    throw new Error(`Google Sheet webhook failed: ${response.status}`);
+  }
+
+  return { success: true };
 };
 
-const sendSubscriptionInterestEmail = async ({ name, email, phone, plan, message }) => {
-  const mailOptions = {
-    from: process.env.SMTP_FROM,
-    to: process.env.SMTP_USER,
-    subject: `ContextSwitch - New ${plan} Plan Interest`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #0a0a0a; background: #c8f542; padding: 20px; border-radius: 8px;">
-          🎉 New Subscription Interest - ${plan} Plan
-        </h2>
-        
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 20px;">
-          <h3 style="margin-top: 0;">User Details</h3>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ''}
-          <p><strong>Interested Plan:</strong> <span style="color: #c8f542; background: #0a0a0a; padding: 4px 12px; border-radius: 4px;">${plan}</span></p>
-        </div>
-        
-        ${message ? `
-        <div style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-          <h3 style="margin-top: 0;">Additional Message</h3>
-          <p>${message}</p>
-        </div>
-        ` : ''}
-        
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px;">
-          <p style="margin: 0;"><strong>Action Required:</strong> Contact this user to complete their subscription.</p>
-        </div>
-        
-        <p style="color: #666; font-size: 12px; margin-top: 20px;">
-          This email was sent from ContextSwitch website pricing section.
-        </p>
-      </div>
-    `,
-  };
+const saveContactForm = async ({ name, email, phone, subject, message }) => {
+  return saveToSheet({
+    type: 'contact',
+    name,
+    email,
+    phone: phone || '',
+    subject: subject || 'General Inquiry',
+    message,
+  });
+};
 
-  return transporter.sendMail(mailOptions);
+const saveSubscriptionInterest = async ({ name, email, phone, plan, message }) => {
+  return saveToSheet({
+    type: 'subscription',
+    name,
+    email,
+    phone: phone || '',
+    subject: `Subscription Interest - ${plan}`,
+    message: message || `User wants to subscribe to ${plan} plan`,
+  });
 };
 
 module.exports = {
-  sendContactEmail,
-  sendSubscriptionInterestEmail,
+  saveContactForm,
+  saveSubscriptionInterest,
 };

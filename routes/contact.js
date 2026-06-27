@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendContactEmail, sendSubscriptionInterestEmail } = require('../services/emailService');
+const { saveContactForm, saveSubscriptionInterest } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    await sendContactEmail({ name, email, phone, subject, message });
+    await saveContactForm({ name, email, phone, subject, message });
 
     res.json({ 
       success: true, 
@@ -40,7 +40,7 @@ router.post('/subscription', async (req, res) => {
       });
     }
 
-    await sendSubscriptionInterestEmail({ name, email, phone, plan, message });
+    await saveSubscriptionInterest({ name, email, phone, plan, message });
 
     res.json({ 
       success: true, 
