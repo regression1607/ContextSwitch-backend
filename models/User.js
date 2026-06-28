@@ -46,8 +46,13 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: null
     },
-    stripeCustomerId: String,
-    stripeSubscriptionId: String
+    billingCycle: {
+      type: String,
+      enum: ['monthly', 'yearly'],
+      default: 'monthly'
+    },
+    razorpayPaymentId: String,
+    razorpayOrderId: String
   },
   // Usage tracking
   usage: {

@@ -8,6 +8,7 @@ const compressRoutes = require('./routes/compress');
 const contactRoutes = require('./routes/contact');
 const userRoutes = require('./routes/user');
 const postRoutes = require('./routes/posts');
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use('/api/compress', compressRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // 404 handler
 app.use((req, res) => {
