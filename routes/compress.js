@@ -71,7 +71,8 @@ router.post('/', auth, checkSubscription, async (req, res) => {
 
     // Use GPT to compress into ultra-compact AI-readable format
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-nano',
+      reasoning_effort: 'minimal',
       messages: [
         {
           role: 'system',
@@ -98,8 +99,7 @@ The output must be a SINGLE LINE with ZERO unnecessary spaces. AI will parse thi
           content: `Compress this conversation from project "${projectName || 'Unknown'}" into ultra-compact AI-readable format:\n\n${conversationText}`
         }
       ],
-      max_tokens: 1500,
-      temperature: 0.2
+      max_completion_tokens: 1500
     });
 
     const compressedContext = completion.choices[0].message.content;

@@ -125,6 +125,23 @@ router.get('/history', auth, async (req, res) => {
   }
 });
 
+// Track a context save event (content stays local; only a count/event is sent)
+router.post('/track-save', auth, async (req, res) => {
+  try {
+    const count = Number.isInteger(req.body?.count) && req.body.count > 0 ? req.body.count : 1;
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $inc: { 'usage.totalContextsSaved': count },
+      $set: { 'usage.lastActiveAt': new Date() },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Track save error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Update user profile
 router.put('/profile', auth, async (req, res) => {
   try {

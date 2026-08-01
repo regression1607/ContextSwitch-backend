@@ -80,7 +80,8 @@ const userSchema = new mongoose.Schema({
     lastResetAt: {
       type: Date,
       default: Date.now
-    }
+    },
+    lastActiveAt: Date
   },
   // Subscription limits based on plan
   limits: {
